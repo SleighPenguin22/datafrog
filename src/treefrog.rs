@@ -772,7 +772,7 @@ pub(crate) mod filter_anti {
 ///
 /// By accepting a vector instead of a slice, we can do a small optimization when computing the
 /// midpoint.
-fn binary_search<T>(vec: &[T], mut cmp: impl FnMut(&T) -> bool) -> usize {
+fn binary_search<T>(vec: &Vec<T>, mut cmp: impl FnMut(&T) -> bool) -> usize {
     // The midpoint calculation we use below is only correct for vectors with less than `isize::MAX`
     // elements. This is always true for vectors of sized types but maybe not for ZSTs? Sorting
     // ZSTs doesn't make much sense, so just forbid it here.
