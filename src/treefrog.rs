@@ -13,8 +13,8 @@ pub(crate) fn leapjoin<'leap, Tuple: Ord, Val: Ord + 'leap, Result: Ord>(
 
     for tuple in source {
         // Determine which leaper would propose the fewest values.
-        let mut min_index = usize::max_value();
-        let mut min_count = usize::max_value();
+        let mut min_index = usize::MAX;
+        let mut min_count = usize::MAX;
         leapers.for_each_count(tuple, |index, count| {
             if min_count > count {
                 min_count = count;
@@ -23,7 +23,7 @@ pub(crate) fn leapjoin<'leap, Tuple: Ord, Val: Ord + 'leap, Result: Ord>(
         });
 
         // We had best have at least one relation restricting values.
-        assert!(min_count < usize::max_value());
+        assert!(min_count < usize::MAX);
 
         // If there are values to propose:
         if min_count > 0 {
@@ -132,7 +132,7 @@ pub(crate) mod filters {
         predicate: Func,
     }
 
-    impl<'leap, Tuple, Func> PrefixFilter<Tuple, Func>
+    impl<Tuple, Func> PrefixFilter<Tuple, Func>
     where
         Func: Fn(&Tuple) -> bool,
     {
@@ -152,7 +152,7 @@ pub(crate) mod filters {
         /// Estimates the number of proposed values.
         fn count(&mut self, prefix: &Tuple) -> usize {
             if (self.predicate)(prefix) {
-                usize::max_value()
+                usize::MAX
             } else {
                 0
             }
@@ -252,7 +252,7 @@ pub(crate) mod filters {
         predicate: Func,
     }
 
-    impl<'leap, Tuple, Val, Func> ValueFilter<Tuple, Val, Func>
+    impl<Tuple, Val, Func> ValueFilter<Tuple, Val, Func>
     where
         Func: Fn(&Tuple, &Val) -> bool,
     {
@@ -271,7 +271,7 @@ pub(crate) mod filters {
     {
         /// Estimates the number of proposed values.
         fn count(&mut self, _prefix: &Tuple) -> usize {
-            usize::max_value()
+            usize::MAX
         }
         /// Populates `values` with proposed values.
         fn propose(&mut self, _prefix: &Tuple, _values: &mut Vec<&'leap Val>) {
@@ -432,9 +432,9 @@ pub(crate) mod extend_with {
         fn count(&mut self, prefix: &Tuple) -> usize {
             let key = (self.key_func)(prefix);
             if self.old_key.as_ref() != Some(&key) {
-                self.start = binary_search(&self.relation.elements, |x| &x.0 < &key);
+                self.start = binary_search(&self.relation.elements, |x| x.0 < key);
                 let slice1 = &self.relation[self.start..];
-                let slice2 = gallop(slice1, |x| &x.0 <= &key);
+                let slice2 = gallop(slice1, |x| x.0 <= key);
                 self.end = self.relation.len() - slice2.len();
 
                 self.old_key = Some(key);
@@ -444,13 +444,13 @@ pub(crate) mod extend_with {
         }
         fn propose(&mut self, _prefix: &Tuple, values: &mut Vec<&'leap Val>) {
             let slice = &self.relation[self.start..self.end];
-            values.extend(slice.iter().map(|&(_, ref val)| val));
+            values.extend(slice.iter().map(|(_, ref val)| val));
         }
         fn intersect(&mut self, _prefix: &Tuple, values: &mut Vec<&'leap Val>) {
             let mut slice = &self.relation[self.start..self.end];
             values.retain(|v| {
                 slice = gallop(slice, |kv| &kv.1 < v);
-                slice.get(0).map(|kv| &kv.1) == Some(v)
+                slice.first().map(|kv| &kv.1) == Some(v)
             });
         }
     }
@@ -529,7 +529,7 @@ pub(crate) mod extend_anti {
         Func: Fn(&Tuple) -> Key,
     {
         fn count(&mut self, _prefix: &Tuple) -> usize {
-            usize::max_value()
+            usize::MAX
         }
         fn propose(&mut self, _prefix: &Tuple, _values: &mut Vec<&'leap Val>) {
             panic!("ExtendAnti::propose(): variable apparently unbound.");
@@ -541,10 +541,10 @@ pub(crate) mod extend_anti {
                 Some((old, range)) if old == &key => range.clone(),
 
                 _ => {
-                    let start = binary_search(&self.relation.elements, |x| &x.0 < &key);
+                    let start = binary_search(&self.relation.elements, |x| x.0 < key);
                     let slice1 = &self.relation[start..];
-                    let slice2 = gallop(slice1, |x| &x.0 <= &key);
-                    let range = start..self.relation.len()-slice2.len();
+                    let slice2 = gallop(slice1, |x| x.0 <= key);
+                    let range = start..self.relation.len() - slice2.len();
 
                     self.old_key = Some((key, range.clone()));
 
@@ -556,7 +556,7 @@ pub(crate) mod extend_anti {
             if !slice.is_empty() {
                 values.retain(|v| {
                     slice = gallop(slice, |kv| &kv.1 < v);
-                    slice.get(0).map(|kv| &kv.1) != Some(v)
+                    slice.first().map(|kv| &kv.1) != Some(v)
                 });
             }
         }
@@ -622,7 +622,11 @@ pub(crate) mod filter_with {
 
             let is_present = self.relation.binary_search(&key_val).is_ok();
             self.old_key_val = Some((key_val, is_present));
-            if is_present { usize::MAX } else { 0 }
+            if is_present {
+                usize::MAX
+            } else {
+                0
+            }
         }
         fn propose(&mut self, _prefix: &Tuple, _values: &mut Vec<&'leap Val2>) {
             panic!("FilterWith::propose(): variable apparently unbound.");
@@ -719,7 +723,11 @@ pub(crate) mod filter_anti {
 
             let is_present = self.relation.binary_search(&key_val).is_ok();
             self.old_key_val = Some((key_val, is_present));
-            if is_present { 0 } else { usize::MAX }
+            if is_present {
+                0
+            } else {
+                usize::MAX
+            }
         }
         fn propose(&mut self, _prefix: &Tuple, _values: &mut Vec<&'leap Val2>) {
             panic!("FilterAnti::propose(): variable apparently unbound.");
@@ -764,7 +772,7 @@ pub(crate) mod filter_anti {
 ///
 /// By accepting a vector instead of a slice, we can do a small optimization when computing the
 /// midpoint.
-fn binary_search<T>(vec: &Vec<T>, mut cmp: impl FnMut(&T) -> bool) -> usize {
+fn binary_search<T>(vec: &[T], mut cmp: impl FnMut(&T) -> bool) -> usize {
     // The midpoint calculation we use below is only correct for vectors with less than `isize::MAX`
     // elements. This is always true for vectors of sized types but maybe not for ZSTs? Sorting
     // ZSTs doesn't make much sense, so just forbid it here.

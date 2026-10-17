@@ -52,18 +52,18 @@ fn join_delta<'me, Key: Ord, Val1: Ord, Val2: Ord>(
     let recent2 = input2.recent();
 
     input2.for_each_stable_set(|batch2| {
-        join_helper(&recent1, &batch2, &mut result);
+        join_helper(&recent1, batch2, &mut result);
     });
 
     input1.for_each_stable_set(|batch1| {
-        join_helper(&batch1, &recent2, &mut result);
+        join_helper(batch1, &recent2, &mut result);
     });
 
     join_helper(&recent1, &recent2, &mut result);
 }
 
 /// Join, but for two relations.
-pub(crate) fn join_into_relation<'me, Key: Ord, Val1: Ord, Val2: Ord, Result: Ord>(
+pub(crate) fn join_into_relation<Key: Ord, Val1: Ord, Val2: Ord, Result: Ord>(
     input1: &Relation<(Key, Val1)>,
     input2: &Relation<(Key, Val2)>,
     mut logic: impl FnMut(&Key, &Val1, &Val2) -> Result,
